@@ -9,11 +9,16 @@ import org.jspecify.annotations.NonNull;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
+import java.lang.constant.MethodTypeDesc;
+import java.lang.invoke.TypeDescriptor;
+import java.lang.runtime.ObjectMethods;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -336,6 +341,44 @@ final class AnacondyTransformers {
                         "getSamplerCache",
                         "()Lcom/mojang/blaze3d/systems/SamplerCache;"
                 )),
+
+                new SingletonAccessedFieldsTransformer(
+                        targetClass("net/minecraft/client/Camera"),
+                        new ConstantDynamic(
+                                "CAMERA_INSTANCE",
+                                "Lnet/minecraft/client/Camera;",
+                                NULL_CHECK_ON_CONDY_RESOLVE
+                                        ? AnacondyBootstraps.HANDLE_BSM_INVOKE_NON_NULL_WITH_ARGS
+                                        : AnacondyBootstraps.HANDLE_BSM_INVOKE,
+                                new Handle(
+                                        Opcodes.H_GETFIELD,
+                                        "net/minecraft/client/renderer/GameRenderer",
+                                        "mainCamera",
+                                        "Lnet/minecraft/client/Camera;",
+                                        false
+                                ),
+                                new ConstantDynamic(
+                                        "GAME_RENDERER_INSTANCE",
+                                        "Lnet/minecraft/client/renderer/GameRenderer;",
+                                        NULL_CHECK_ON_CONDY_RESOLVE
+                                                ? AnacondyBootstraps.HANDLE_BSM_INVOKE_NON_NULL_WITH_ARGS
+                                                : AnacondyBootstraps.HANDLE_BSM_INVOKE,
+                                        new Handle(
+                                                Opcodes.H_GETFIELD,
+                                                Utils.MINECRAFT_CLASS_NAME,
+                                                "gameRenderer",
+                                                "Lnet/minecraft/client/renderer/GameRenderer;",
+                                                false
+                                        ),
+                                        CONDY_MC_GET_INSTANCE
+                                )
+                        )
+                ),
+                new AnacondyWorkaroundTransformers.MakeFieldAccessibleTransformer(
+                        targetClass("net/minecraft/client/renderer/GameRenderer"),
+                        "mainCamera",
+                        "Lnet/minecraft/client/Camera;"
+                ),
                 //endregion
 
                 //region Forge
