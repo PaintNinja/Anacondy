@@ -132,6 +132,8 @@ final class AnacondyTransformers {
                         )
                 ),
 
+                new ClassToRecordTransformer(),
+
                 //region Rendering
                 new SingletonAccessedFieldsTransformer(
                         targetClass("net/minecraft/client/renderer/GameRenderer"),
@@ -379,6 +381,8 @@ final class AnacondyTransformers {
                         "mainCamera",
                         "Lnet/minecraft/client/Camera;"
                 ),
+
+                // Lighting done inside ClassToRecordTransformer instead
                 //endregion
 
                 //region Forge
@@ -678,6 +682,394 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/client/sounds/MusicManager"),
 
                     targetClass("net/minecraft/client/telemetry/ClientTelemetryManager")
+            );
+        }
+    }
+
+    static final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransformer<ClassNode> {
+        private static final Handle HANDLE_BSM_OBJECT_METHODS = new Handle(
+                Opcodes.H_INVOKESTATIC,
+                "java/lang/runtime/ObjectMethods",
+                "bootstrap",
+                MethodTypeDesc.of(
+                        ConstantDescs.CD_Object,
+                        ConstantDescs.CD_MethodHandles_Lookup,
+                        ConstantDescs.CD_String,
+                        TypeDescriptor.class.describeConstable().orElseThrow(),
+                        ConstantDescs.CD_Class,
+                        ConstantDescs.CD_String,
+                        ConstantDescs.CD_MethodHandle.arrayType()
+                ).descriptorString(),
+                false
+        );
+
+        @Override
+        public @NonNull ClassNode transform(ClassNode classNode, ITransformerVotingContext context) {
+            for (var fieldNode : classNode.fields) {
+                if ((fieldNode.access & Opcodes.ACC_STATIC) != 0) continue; // skip static fields
+                if ((fieldNode.access & Opcodes.ACC_FINAL) == 0) {
+                    LOGGER.debug("Field " + fieldNode.name + " is not final in class " + classNode.name + ", record conversion may fail");
+                    continue;
+                }
+
+                // Add record component for each instance final field
+                classNode.visitRecordComponent(fieldNode.name, fieldNode.desc, fieldNode.signature);
+
+                // Add accessor method for each instance final field if not already present
+                if (ASMAPI.findMethodNode(classNode, fieldNode.name, "()" + fieldNode.desc) == null) {
+                    var accessorMethod = new MethodNode(
+                            Opcodes.ACC_PUBLIC,
+                            fieldNode.name,
+                            "()" + fieldNode.desc,
+                            null,
+                            null
+                    );
+                    accessorMethod.visitCode();
+                    accessorMethod.visitVarInsn(Opcodes.ALOAD, 0);
+                    accessorMethod.visitFieldInsn(Opcodes.GETFIELD, classNode.name, fieldNode.name, fieldNode.desc);
+                    switch (fieldNode.desc.charAt(0)) {
+                        case 'I', 'Z', 'B', 'C', 'S' -> accessorMethod.visitInsn(Opcodes.IRETURN);
+                        case 'J' -> accessorMethod.visitInsn(Opcodes.LRETURN);
+                        case 'F' -> accessorMethod.visitInsn(Opcodes.FRETURN);
+                        case 'D' -> accessorMethod.visitInsn(Opcodes.DRETURN);
+                        case 'L', '[' -> accessorMethod.visitInsn(Opcodes.ARETURN);
+                        default -> throw new IllegalStateException("Unexpected primitive type descriptor: " + fieldNode.desc);
+                    }
+                    accessorMethod.visitEnd();
+                    classNode.methods.add(accessorMethod);
+                }
+            }
+
+            // Mark class as a record
+            classNode.access |= Opcodes.ACC_RECORD | Opcodes.ACC_FINAL;
+
+            if (classNode.superName != null && !classNode.superName.equals("java/lang/Object"))
+                throw new IllegalStateException("Cannot convert class " + classNode.name + " to record because it already has a superclass: " + classNode.superName);
+
+            classNode.superName = "java/lang/Record";
+
+            // Make the canonical constructor if needed. If it already exists, just update its access modifiers to match the class'
+            int canonicalCtorAccess = classNode.access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE);
+            var canonicalCtorDesc = classNode.recordComponents.stream()
+                    .map(recordComponentNode -> recordComponentNode.descriptor)
+                    .collect(Collectors.joining("", "(", ")V"));
+            var canonicalCtorNode = ASMAPI.findMethodNode(classNode, ConstantDescs.INIT_NAME, canonicalCtorDesc);
+            if (canonicalCtorNode == null) {
+                canonicalCtorNode = new MethodNode(
+                        canonicalCtorAccess,
+                        ConstantDescs.INIT_NAME,
+                        canonicalCtorDesc,
+                        null,
+                        null
+                );
+                canonicalCtorNode.visitCode();
+                canonicalCtorNode.visitVarInsn(Opcodes.ALOAD, 0);
+                // Call super constructor
+                canonicalCtorNode.visitMethodInsn(
+                        Opcodes.INVOKESPECIAL,
+                        classNode.superName,
+                        ConstantDescs.INIT_NAME,
+                        "()V",
+                        false
+                );
+                // Assign fields from parameters
+                int paramIndex = 1;
+                for (var recordComponentNode : classNode.recordComponents) {
+                    canonicalCtorNode.visitVarInsn(Opcodes.ALOAD, 0);
+                    char firstChar = recordComponentNode.descriptor.charAt(0);
+                    switch (firstChar) {
+                        case 'I', 'Z', 'B', 'C', 'S' -> canonicalCtorNode.visitVarInsn(Opcodes.ILOAD, paramIndex++);
+                        case 'J' -> canonicalCtorNode.visitVarInsn(Opcodes.LLOAD, paramIndex++);
+                        case 'F' -> canonicalCtorNode.visitVarInsn(Opcodes.FLOAD, paramIndex++);
+                        case 'D' -> canonicalCtorNode.visitVarInsn(Opcodes.DLOAD, paramIndex++);
+                        case 'L', '[' -> canonicalCtorNode.visitVarInsn(Opcodes.ALOAD, paramIndex++);
+                        default -> throw new UnsupportedOperationException();
+                    }
+                    canonicalCtorNode.visitFieldInsn(
+                            Opcodes.PUTFIELD,
+                            classNode.name,
+                            recordComponentNode.name,
+                            recordComponentNode.descriptor
+                    );
+                }
+            } else {
+                canonicalCtorNode.access = canonicalCtorAccess;
+            }
+
+            // Ensure all constructors call super() on Record, not Object
+            for (var methodNode : classNode.methods) {
+                if (!methodNode.name.equals(ConstantDescs.INIT_NAME)) continue;
+
+                for (var insn : methodNode.instructions) {
+                    if (insn instanceof MethodInsnNode methodInsn
+                            && methodInsn.getOpcode() == Opcodes.INVOKESPECIAL
+                            && methodInsn.name.equals(ConstantDescs.INIT_NAME)
+                            && methodInsn.owner.equals("java/lang/Object")) {
+                        methodInsn.owner = "java/lang/Record";
+                    }
+                }
+            }
+
+            // Add equals, hashCode, and toString methods if not already present
+            var hasEquals = ASMAPI.findMethodNode(classNode, "equals", "(Ljava/lang/Object;)Z") != null;
+            if (!hasEquals) {
+                var equalsMethod = new MethodNode(Opcodes.ACC_PUBLIC, "equals", "(Ljava/lang/Object;)Z", null, null);
+                equalsMethod.visitCode();
+                equalsMethod.visitVarInsn(Opcodes.ALOAD, 0);
+                equalsMethod.visitVarInsn(Opcodes.ALOAD, 1);
+
+                // Need to generate an INDY call to ObjectMethods.bootstrap() for equals
+
+                // But first, prepare the bootstrap arguments
+                var bootstrapArgs = new ArrayList<>();
+                bootstrapArgs.add(Type.getObjectType(classNode.name)); // the class type we're generating equals for
+                // the record component names, separated by semicolons
+                bootstrapArgs.add(classNode.recordComponents.stream()
+                        .map(recordComponentNode -> recordComponentNode.name)
+                        .collect(Collectors.joining(";"))
+                );
+                // the accessor handles for each record component
+                for (var recordComponentNode : classNode.recordComponents) {
+                    bootstrapArgs.add(new Handle(
+                            Opcodes.H_GETFIELD,
+                            classNode.name,
+                            recordComponentNode.name,
+                            recordComponentNode.descriptor,
+                            false
+                    ));
+                }
+
+                equalsMethod.visitInvokeDynamicInsn(
+                        "equals",
+                        "(L" + classNode.name + ";Ljava/lang/Object;)Z",
+                        HANDLE_BSM_OBJECT_METHODS,
+                        bootstrapArgs.toArray()
+                );
+                equalsMethod.visitInsn(Opcodes.IRETURN);
+                classNode.methods.add(equalsMethod);
+            }
+
+            var hasHashCode = ASMAPI.findMethodNode(classNode, "hashCode", "()I") != null;
+            if (!hasHashCode) {
+                var hashCodeMethod = new MethodNode(Opcodes.ACC_PUBLIC, "hashCode", "()I", null, null);
+                hashCodeMethod.visitCode();
+                hashCodeMethod.visitVarInsn(Opcodes.ALOAD, 0);
+
+                // Same process as generating the equals() indy call
+                var bootstrapArgs = new ArrayList<>();
+                bootstrapArgs.add(Type.getObjectType(classNode.name));
+                bootstrapArgs.add(classNode.recordComponents.stream()
+                        .map(recordComponentNode -> recordComponentNode.name)
+                        .collect(Collectors.joining(";"))
+                );
+                for (var recordComponentNode : classNode.recordComponents) {
+                    bootstrapArgs.add(new Handle(
+                            Opcodes.H_GETFIELD,
+                            classNode.name,
+                            recordComponentNode.name,
+                            recordComponentNode.descriptor,
+                            false
+                    ));
+                }
+
+                hashCodeMethod.visitInvokeDynamicInsn(
+                        "hashCode",
+                        "(L" + classNode.name + ";)I",
+                        HANDLE_BSM_OBJECT_METHODS,
+                        bootstrapArgs.toArray()
+                );
+                hashCodeMethod.visitInsn(Opcodes.IRETURN);
+                classNode.methods.add(hashCodeMethod);
+            }
+
+            var hasToString = ASMAPI.findMethodNode(classNode, "toString", "()Ljava/lang/String;") != null;
+            if (!hasToString) {
+                var toStringMethod = new MethodNode(Opcodes.ACC_PUBLIC, "toString", "()Ljava/lang/String;", null, null);
+                toStringMethod.visitCode();
+                toStringMethod.visitVarInsn(Opcodes.ALOAD, 0);
+
+                // Same process as generating the equals() indy call
+                var bootstrapArgs = new ArrayList<>();
+                bootstrapArgs.add(Type.getObjectType(classNode.name));
+                bootstrapArgs.add(classNode.recordComponents.stream()
+                        .map(recordComponentNode -> recordComponentNode.name)
+                        .collect(Collectors.joining(";"))
+                );
+                for (var recordComponentNode : classNode.recordComponents) {
+                    bootstrapArgs.add(new Handle(
+                            Opcodes.H_GETFIELD,
+                            classNode.name,
+                            recordComponentNode.name,
+                            recordComponentNode.descriptor,
+                            false
+                    ));
+                }
+
+                toStringMethod.visitInvokeDynamicInsn(
+                        "toString",
+                        "(L" + classNode.name + ";)Ljava/lang/String;",
+                        HANDLE_BSM_OBJECT_METHODS,
+                        bootstrapArgs.toArray()
+                );
+                toStringMethod.visitInsn(Opcodes.ARETURN);
+                classNode.methods.add(toStringMethod);
+            }
+
+            return classNode;
+        }
+
+        @Override
+        public @NotNull Set<Target> targets() {
+            return Set.of(
+                    targetClass("com/mojang/blaze3d/platform/Lighting"),
+
+                    targetClass("com/mojang/datafixers/util/Pair"),
+
+                    targetClass("net/minecraft/client/User"),
+
+                    targetClass("net/minecraft/client/animation/KeyframeAnimation"),
+
+                    targetClass("net/minecraft/client/color/block/BlockColors"),
+                    targetClass("net/minecraft/client/color/block/BlockTintCache"),
+
+                    targetClass("net/minecraft/client/renderer/CubeMap"),
+                    targetClass("net/minecraft/client/renderer/GlobalSettingsUniform"),
+                    targetClass("net/minecraft/client/renderer/LevelEventHandler"),
+                    targetClass("net/minecraft/client/renderer/LightTexture"), // needs more testing
+                    targetClass("net/minecraft/client/renderer/MappableRingBuffer"), // needs more testing
+                    targetClass("net/minecraft/client/renderer/SkyRenderer"),
+                    targetClass("net/minecraft/client/renderer/SpecialBlockModelRenderer"),
+                    targetClass("net/minecraft/client/renderer/SpriteCoordinateExpander"),
+                    targetClass("net/minecraft/client/renderer/SubmitNodeCollection"),
+                    targetClass("net/minecraft/client/renderer/SubmitNodeStorage"),
+
+                    targetClass("net/minecraft/resources/Identifier"),
+
+                    // commented out due to ExceptionInInitializerError during testing
+//                    targetClass("net/minecraft/stats/StatType"),
+
+                    targetClass("net/minecraft/util/TickThrottler"),
+                    targetClass("net/minecraft/util/ZeroBitStorage"),
+
+                    targetClass("net/minecraft/util/context/ContextKey"),
+                    // commented out due to ExceptionInInitializerError during testing
+                    // likely needs a different hashcode and equals than the default generated for records
+//                    targetClass("net/minecraft/util/context/ContextKeySet"),
+                    targetClass("net/minecraft/util/context/ContextMap"),
+
+                    targetClass("net/minecraft/world/entity/ai/attributes/AttributeMap"),
+//                    // todo: more classes inside net/minecraft/world/entity/ai/behavior
+                    targetClass("net/minecraft/world/entity/ai/behavior/BlockPosTracker"),
+                    targetClass("net/minecraft/world/entity/ai/behavior/DoNothing"), // needs more testing
+                    targetClass("net/minecraft/world/entity/ai/behavior/EntityTracker"),
+
+                    targetClass("net/minecraft/world/entity/ai/gossip/GossipContainer"),
+
+                    targetClass("net/minecraft/world/entity/ai/memory/ExpirableValue"), // needs more testing
+                    // commented out due to ExceptionInInitializerError during testing
+                    // likely needs a different hashcode and equals than the default generated for records
+//                    targetClass("net/minecraft/world/entity/ai/memory/MemoryModuleType"),
+                    targetClass("net/minecraft/world/entity/ai/memory/NearestVisibleLivingEntities"),
+                    targetClass("net/minecraft/world/entity/ai/memory/WalkTarget"),
+
+                    targetClass("net/minecraft/world/entity/schedule/Activity"),
+
+                    targetClass("net/minecraft/world/entity/Crackiness"),
+                    targetClass("net/minecraft/world/entity/EntityType"), // needs more testing
+
+                    targetClass("net/minecraft/world/flag/FeatureFlagRegistry"),
+                    targetClass("net/minecraft/world/flag/FeatureFlagSet"),
+                    targetClass("net/minecraft/world/flag/FeatureFlagUniverse"),
+
+                    targetClass("net/minecraft/world/level/ChunkPos"),
+                    targetClass("net/minecraft/world/level/ClipBlockStateContext"),
+                    targetClass("net/minecraft/world/level/DataPackConfig"),
+                    targetClass("net/minecraft/world/level/LevelSettings"),
+                    targetClass("net/minecraft/world/level/StructureManager"),
+
+                    targetClass("net/minecraft/world/level/biome/BiomeGenerationSettings"),
+
+                    targetClass("net/minecraft/world/level/levelgen/Beardifier"),
+                    targetClass("net/minecraft/world/level/levelgen/BelowZeroRetrogen"),
+                    targetClass("net/minecraft/world/level/levelgen/GeodeBlockSettings"),
+                    targetClass("net/minecraft/world/level/levelgen/GeodeCrackSettings"),
+                    targetClass("net/minecraft/world/level/levelgen/GeodeLayerSettings"),
+                    targetClass("net/minecraft/world/level/levelgen/Heightmap"),
+                    targetClass("net/minecraft/world/level/levelgen/SurfaceSystem"),
+                    targetClass("net/minecraft/world/level/levelgen/WorldOptions"),
+                    targetClass("net/minecraft/world/level/levelgen/XoroshiroRandomSource"),
+                    targetClass("net/minecraft/world/level/levelgen/XoroshiroRandomSource$XoroshiroPositionalRandomFactory"),
+
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/BlockStateConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/ColumnFeatureConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/CountConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/DeltaFeatureConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/DripstoneClusterConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/EndGatewayConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/GeodeConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/HugeMushroomConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/LargeDripstoneConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/LayerConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/MultifaceGrowthConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/PointedDripstoneConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/RandomBooleanFeatureConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/RandomFeatureConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/ReplaceBlockConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/ReplaceSphereConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/RootSystemConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/SimpleRandomFeatureConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/SpikeConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/SpringConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/UnderwaterMagmaConfiguration"),
+                    targetClass("net/minecraft/world/level/levelgen/feature/configurations/VegetationPatchConfiguration"),
+
+                    targetClass("net/minecraft/world/level/levelgen/flat/FlatLayerInfo"),
+
+                    targetClass("net/minecraft/world/level/levelgen/presets/WorldPreset"),
+
+                    targetClass("net/minecraft/world/level/levelgen/structure/StructureCheck"),
+
+                    targetClass("net/minecraft/world/level/levelgen/sampler/BlendedNoise"),
+                    targetClass("net/minecraft/world/level/levelgen/sampler/NormalNoise"),
+                    targetClass("net/minecraft/world/level/levelgen/sampler/ImprovedNoise"),
+
+                    targetClass("net/minecraft/world/level/levelgen/synth/PerlinNoise"),
+                    targetClass("net/minecraft/world/level/levelgen/synth/PerlinSimplexNoise"),
+                    targetClass("net/minecraft/world/level/levelgen/synth/SimplexNoise"),
+
+                    targetClass("net/minecraft/world/level/lighting/ChunkSkyLightSources"),
+                    targetClass("net/minecraft/world/level/lighting/LeveledPriorityQueue"),
+
+                    targetClass("net/minecraft/world/level/material/MapColor"),
+
+                    targetClass("net/minecraft/world/level/pathfinder/Path"),
+                    targetClass("net/minecraft/world/level/pathfinder/PathfindingContext"),
+                    targetClass("net/minecraft/world/level/pathfinder/PathTypeCache"),
+
+                    // todo: more classes inside net/minecraft/world/level/storage
+                    targetClass("net/minecraft/world/level/storage/DerivedLevelData"),
+                    targetClass("net/minecraft/world/level/storage/DimensionDataStorage"),
+                    targetClass("net/minecraft/world/level/storage/LevelVersion"),
+
+                    targetClass("net/minecraft/world/level/timers/TimerCallbacks"),
+                    targetClass("net/minecraft/world/level/timers/TimerQueue"),
+                    targetClass("net/minecraft/world/level/timers/TimerQueue$Event"),
+
+                    targetClass("net/minecraft/world/phys/AABB"),
+                    targetClass("net/minecraft/world/phys/Vec2"),
+                    targetClass("net/minecraft/world/phys/Vec3"),
+
+                    targetClass("net/minecraft/world/phys/shapes/IdenticalMerger"),
+
+                    targetClass("net/minecraft/world/ticks/LevelChunkTicks"), // needs more testing
+                    targetClass("net/minecraft/world/ticks/LevelTicks"),
+                    targetClass("net/minecraft/world/ticks/WorldGenTickAccess"),
+
+                    targetClass("net/minecraft/world/timeline/Timeline"),
+
+                    targetClass("net/minecraft/world/CompoundContainer"),
+                    targetClass("net/minecraft/world/DifficultyInstance"),
+                    targetClass("net/minecraft/world/RandomSequence")
             );
         }
     }
