@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '7.0.0-rc.2'
+}
+
+version = mod_version
+group = 'ga.ozli.minecraftmods.anacondymod'
+base.archivesName = mod_id
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation "net.minecraftforge:javafmllanguage:$minecraft_version-$forge_version"
+}

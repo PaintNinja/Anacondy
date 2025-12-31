@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '7.0.0-rc.2'
+    id 'net.minecraftforge.jarjar' version '0.2.3'
+}
+
+version = mod_version
+group = 'ga.ozli.minecraftmods.anacondy'
+base.archivesName = mod_id
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+minecraft {
+    mappings channel: 'official', version: '1.21.11'
+    runs.register('client')
+}
+
+repositories {
+    maven minecraft.mavenizer
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+// Creates the jarJar configuration.
+// This creates the 'jarJar' task, which by default has a classifier of 'all', with a base of the 'jar' task
+// For more info see https://github.com/MinecraftForge/JarJar/blob/main/jarjar-gradle/src/main/java/net/minecraftforge/jarjar/gradle/JarJarExtension.java
+jarJar.register()
+
+// If you want to have your "normal" jar the 'all' jar, you can change the classifer using normal gradle configuration
+tasks.named('jar') {
+    archiveClassifier = 'slim'
+}
+tasks.named('jarJar') {
+    archiveClassifier = null
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:$minecraft_version-$forge_version")
+
+    implementation project(':mod')
+
+    jarJar(project(':mod'))
+}
