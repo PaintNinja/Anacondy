@@ -1,4 +1,4 @@
-package ga.ozli.minecraftmods.anacondytransformer;
+package ga.ozli.minecraftmods.anacondy.transformer;
 
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;

@@ -1,4 +1,4 @@
-package ga.ozli.minecraftmods.anacondytransformer;
+package ga.ozli.minecraftmods.anacondy.transformer;
 
 import cpw.mods.modlauncher.api.ITransformer;
 import cpw.mods.modlauncher.api.ITransformerVotingContext;
@@ -14,15 +14,16 @@ import java.util.Set;
 import static cpw.mods.modlauncher.api.ITransformer.Target.targetClass;
 import static cpw.mods.modlauncher.api.ITransformer.Target.targetMethod;
 
-final class AnacondyWorkaroundTransformers {
-    private AnacondyWorkaroundTransformers() {}
+final class Workarounds {
+    private Workarounds() {}
 
     /**
      * Rewrites the call to {@code Minecraft.getWindow()} inside {@code Options.getFullscreenVideoModeString()}
      * to instead call {@code Minecraft.getWindow$AnacondyNoInline()}, to work around an issue where this method is
      * called before the window is set, causing an NPE as the window field is then constant folded to {@code null}.
      */
-    static final class OptionsGetFullscreenVideoModeStringFixer implements AnacondyTransformers.Transformer<MethodNode>, ITransformer<MethodNode> {
+    static final class OptionsGetFullscreenVideoModeStringFixer
+            implements Transformer<MethodNode>, ITransformer<MethodNode> {
         @Override
         public @NonNull MethodNode transform(MethodNode methodNode, ITransformerVotingContext context) {
             // Find Minecraft#getWindow() call and replace with Minecraft#getWindow$AnacondyNoInline()
@@ -59,7 +60,8 @@ final class AnacondyWorkaroundTransformers {
     /**
      * @see OptionsGetFullscreenVideoModeStringFixer
      */
-    static final class MinecraftClientAddGetWindowNoInlineMethodTransformer implements AnacondyTransformers.Transformer<ClassNode>, ITransformer<ClassNode> {
+    static final class MinecraftClientAddGetWindowNoInlineMethodTransformer
+            implements Transformer<ClassNode>, ITransformer<ClassNode> {
         @Override
         public @NonNull ClassNode transform(ClassNode classNode, ITransformerVotingContext context) {
             var noInlineMethod = new MethodNode(
@@ -95,11 +97,8 @@ final class AnacondyWorkaroundTransformers {
     /**
      * Workaround until I get AccessTransformers setup in the mod part of Anacondy.
      */
-    record MakeFieldAccessibleTransformer(
-            Target targetClass,
-            String fieldName,
-            String fieldDescriptor
-    ) implements AnacondyTransformers.Transformer<ClassNode>, ITransformer<ClassNode> {
+    record MakeFieldAccessible(Target targetClass, String fieldName, String fieldDescriptor)
+            implements Transformer<ClassNode>, ITransformer<ClassNode> {
         @Override
         public @NonNull ClassNode transform(ClassNode classNode, ITransformerVotingContext context) {
             for (var field : classNode.fields) {

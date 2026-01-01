@@ -1,8 +1,9 @@
-package ga.ozli.minecraftmods.anacondytransformer;
+package ga.ozli.minecraftmods.anacondy;
 
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformationService;
 import cpw.mods.modlauncher.api.ITransformer;
+import ga.ozli.minecraftmods.anacondy.transformer.AnacondyTransformers;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
