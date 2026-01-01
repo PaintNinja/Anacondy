@@ -875,10 +875,60 @@ final class AnacondyTransformers {
         @Override
         public @NotNull Set<Target> targets() {
             return Set.of(
+                    targetClass("com/mojang/blaze3d/audio/Channel"),
+
+                    targetClass("com/mojang/blaze3d/buffers/Std140Builder"),
+
+                    targetClass("com/mojang/blaze3d/font/SpaceProvider"),
+
+                    targetClass("com/mojang/blaze3d/framegraph/FrameGraphBuilder"),
+                    targetClass("com/mojang/blaze3d/framegraph/FrameGraphBuilder$Handle"),
+                    targetClass("com/mojang/blaze3d/framegraph/FrameGraphBuilder$Pass"),
+
+                    targetClass("com/mojang/blaze3d/opengl/GlBuffer$GlMappedView"),
+                    targetClass("com/mojang/blaze3d/opengl/GlCommandEncoder"),
+                    targetClass("com/mojang/blaze3d/opengl/GlDevice"),
+                    targetClass("com/mojang/blaze3d/opengl/GlProgram"),
+                    targetClass("com/mojang/blaze3d/opengl/GlRenderPass"),
+                    targetClass("com/mojang/blaze3d/opengl/GlShaderModule"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$BlendState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$BooleanState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$ColorLogicState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$CullState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$DepthState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$PolygonOffsetState"),
+                    targetClass("com/mojang/blaze3d/opengl/GlStateManager$ScissorState"),
+                    targetClass("com/mojang/blaze3d/opengl/VertexArrayCache$VertexArray"),
+
+                    targetClass("com/mojang/blaze3d/pipeline/MainTarget$Dimension"),
+                    targetClass("com/mojang/blaze3d/pipeline/RenderPipeline"),
+
+                    targetClass("com/mojang/blaze3d/platform/FramerateLimitTracker"),
                     targetClass("com/mojang/blaze3d/platform/Lighting"),
+                    targetClass("com/mojang/blaze3d/platform/Monitor"),
+                    targetClass("com/mojang/blaze3d/platform/NativeImage"),
+                    targetClass("com/mojang/blaze3d/platform/ScreenManager"),
+                    targetClass("com/mojang/blaze3d/platform/VideoMode"),
+
+                    targetClass("com/mojang/blaze3d/platform/cursor/CursorType"),
+
+                    targetClass("com/mojang/blaze3d/systems/RenderSystem$AutoStorageIndexBuffer"),
+
+                    targetClass("com/mojang/blaze3d/vertex/BufferBuilder"),
+                    targetClass("com/mojang/blaze3d/vertex/CompactVectorArray"),
+                    targetClass("com/mojang/blaze3d/vertex/MeshData"),
+                    targetClass("com/mojang/blaze3d/vertex/PoseStack"),
+                    targetClass("com/mojang/blaze3d/vertex/PoseStack$Pose"),
+                    targetClass("com/mojang/blaze3d/vertex/Tesselator"),
+                    targetClass("com/mojang/blaze3d/vertex/VertexFormat"),
+                    targetClass("com/mojang/blaze3d/vertex/VertexMultiConsumer$Double"),
+
+                    targetClass("com/mojang/math/Divisor"),
+                    targetClass("com/mojang/math/Transformation"),
 
                     targetClass("com/mojang/datafixers/util/Pair"),
 
+                    targetClass("net/minecraft/client/Options"),
                     targetClass("net/minecraft/client/User"),
 
                     targetClass("net/minecraft/client/animation/KeyframeAnimation"),
@@ -886,7 +936,45 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/client/color/block/BlockColors"),
                     targetClass("net/minecraft/client/color/block/BlockTintCache"),
 
+                    // Todo: this.font inside DebugScreenOverlay that is passed to FpsDebugChart and friends comes from the Minecraft singleton instance
+                    targetClass("net/minecraft/client/gui/components/DebugScreenOverlay"),
+
+                    targetClass("net/minecraft/client/gui/components/debugchart/ProfilerPieChart"),
+
+                    targetClass("net/minecraft/client/gui/font/FontOption$Filter"),
+
+                    targetClass("net/minecraft/client/gui/font/glyphs/BakedSheetGlyph"),
+                    targetClass("net/minecraft/client/gui/font/glyphs/EmptyGlyph"),
+
+                    targetClass("net/minecraft/client/renderer/block/BlockRenderDispatcher"),
+                    targetClass("net/minecraft/client/renderer/block/LiquidBlockRenderer"),
+                    targetClass("net/minecraft/client/renderer/block/ModelBlockRenderer"),
+                    targetClass("net/minecraft/client/renderer/block/ModelBlockRenderer$Cache"),
+
+                    targetClass("net/minecraft/client/renderer/chunk/CompiledSectionMesh"),
+                    targetClass("net/minecraft/client/renderer/chunk/RenderRegionCache"),
+                    targetClass("net/minecraft/client/renderer/chunk/RenderSectionRegion"),
+                    targetClass("net/minecraft/client/renderer/chunk/SectionCompiler"),
+                    targetClass("net/minecraft/client/renderer/chunk/SectionCompiler$Results"),
+                    targetClass("net/minecraft/client/renderer/chunk/SectionCopy"),
+
+                    targetClass("net/minecraft/client/renderer/culling/Frustum"),
+
+                    targetClass("net/minecraft/client/renderer/fog/FogRenderer"),
+
+                    targetClass("net/minecraft/client/renderer/rendertype/RenderSetup"),
+                    targetClass("net/minecraft/client/renderer/rendertype/LayeringTransform"),
+                    targetClass("net/minecraft/client/renderer/rendertype/OutputTarget"),
+                    targetClass("net/minecraft/client/renderer/rendertype/RenderType"),
+
+                    // Todo: This causes the game to crash if UnitTextureAtlasSprite is classloaded
+//                    targetClass("net/minecraft/client/renderer/texture/TextureAtlasSprite"),
+                    
+                    targetClass("net/minecraft/client/renderer/texture/OverlayTexture"),
+                    targetClass("net/minecraft/client/renderer/texture/TextureManager"),
+
                     targetClass("net/minecraft/client/renderer/CubeMap"),
+                    targetClass("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer"),
                     targetClass("net/minecraft/client/renderer/GlobalSettingsUniform"),
                     targetClass("net/minecraft/client/renderer/LevelEventHandler"),
                     targetClass("net/minecraft/client/renderer/LightTexture"),
@@ -897,7 +985,38 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/client/renderer/SubmitNodeCollection"),
                     targetClass("net/minecraft/client/renderer/SubmitNodeStorage"),
 
+                    targetClass("net/minecraft/core/Cloner"),
+                    targetClass("net/minecraft/core/Cloner$Factory"),
+                    targetClass("net/minecraft/core/Cursor3D"),
+                    targetClass("net/minecraft/core/RegistrySetBuilder"),
+
+                    targetClass("net/minecraft/core/particles/BlockParticleOption"),
+                    targetClass("net/minecraft/core/particles/ColorParticleOption"),
+                    targetClass("net/minecraft/core/particles/ItemParticleOption"),
+                    targetClass("net/minecraft/core/particles/PowerParticleOption"),
+                    targetClass("net/minecraft/core/particles/ShriekParticleOption"),
+                    targetClass("net/minecraft/core/particles/SpellParticleOption"),
+                    targetClass("net/minecraft/core/particles/VibrationParticleOption"),
+
+                    targetClass("net/minecraft/gizmos/SimpleGizmoCollector"),
+                    targetClass("net/minecraft/gizmos/SimpleGizmoCollector$GismoInstance"),
+
+                    targetClass("net/minecraft/nbt/CompoundTag"),
+
+                    targetClass("net/minecraft/network/chat/MutableComponent"),
+                    targetClass("net/minecraft/network/chat/FilterMask"),
+                    targetClass("net/minecraft/network/chat/Style"),
+                    // Todo: Replace Guava ImmutableList.copyOf() with List.copyOf() in SubStringSource ctor
+                    targetClass("net/minecraft/network/chat/SubStringSource"),
+                    targetClass("net/minecraft/network/chat/TextColor"),
+
+                    targetClass("net/minecraft/network/chat/contents/KeybindContents"),
+                    targetClass("net/minecraft/network/chat/contents/NbtContents"),
+                    targetClass("net/minecraft/network/chat/contents/TranslatableContents"),
+
                     targetClass("net/minecraft/resources/Identifier"),
+                    targetClass("net/minecraft/resources/RegistryOps$HolderLookupAdapter"),
+                    targetClass("net/minecraft/resources/ResourceKey"),
 
                     targetClass("net/minecraft/stats/StatType"),
 
@@ -909,10 +1028,14 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/util/context/ContextMap"),
 
                     targetClass("net/minecraft/world/entity/ai/attributes/AttributeMap"),
-//                    // todo: more classes inside net/minecraft/world/entity/ai/behavior
+
                     targetClass("net/minecraft/world/entity/ai/behavior/BlockPosTracker"),
                     targetClass("net/minecraft/world/entity/ai/behavior/DoNothing"),
                     targetClass("net/minecraft/world/entity/ai/behavior/EntityTracker"),
+                    targetClass("net/minecraft/world/entity/ai/behavior/ShufflingList"),
+                    targetClass("net/minecraft/world/entity/ai/behavior/ShufflingList$WeightedEntry"),
+
+                    targetClass("net/minecraft/world/entity/ai/behavior/declarative/MemoryAccessor"),
 
                     targetClass("net/minecraft/world/entity/ai/gossip/GossipContainer"),
 
@@ -995,10 +1118,20 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/world/level/pathfinder/PathfindingContext"),
                     targetClass("net/minecraft/world/level/pathfinder/PathTypeCache"),
 
-                    // todo: more classes inside net/minecraft/world/level/storage
+                    targetClass("net/minecraft/world/level/storage/CommandStorage"),
                     targetClass("net/minecraft/world/level/storage/DerivedLevelData"),
                     targetClass("net/minecraft/world/level/storage/DimensionDataStorage"),
+                    targetClass("net/minecraft/world/level/storage/LevelResource"),
                     targetClass("net/minecraft/world/level/storage/LevelVersion"),
+                    targetClass("net/minecraft/world/level/storage/PlayerDataStorage"),
+                    targetClass("net/minecraft/world/level/storage/PrimaryLevelData"),
+                    targetClass("net/minecraft/world/level/storage/TagValueInput"),
+                    targetClass("net/minecraft/world/level/storage/TagValueInput$CompoundListWrapper"),
+                    targetClass("net/minecraft/world/level/storage/TagValueInput$ListWrapper"),
+                    targetClass("net/minecraft/world/level/storage/TagValueInput$TypedListWrapper"),
+                    targetClass("net/minecraft/world/level/storage/TagValueOutput"),
+                    targetClass("net/minecraft/world/level/storage/TagValueOutput$ListWrapper"),
+                    targetClass("net/minecraft/world/level/storage/TagValueOutput$TypedListWrapper"),
 
                     targetClass("net/minecraft/world/level/timers/TimerCallbacks"),
                     targetClass("net/minecraft/world/level/timers/TimerQueue"),
