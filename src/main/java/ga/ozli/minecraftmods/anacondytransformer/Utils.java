@@ -46,6 +46,34 @@ final class Utils {
         return result.toString();
     }
 
+    static void visitLoadVarInsn(MethodNode methodNode, String desc, int varIndex) {
+        methodNode.visitVarInsn(
+                switch (desc.charAt(0)) {
+                    case 'I', 'Z', 'B', 'C', 'S' -> Opcodes.ILOAD;
+                    case 'J' -> Opcodes.LLOAD;
+                    case 'F' -> Opcodes.FLOAD;
+                    case 'D' -> Opcodes.DLOAD;
+                    case 'L', '[' -> Opcodes.ALOAD;
+                    default -> throw new UnsupportedOperationException();
+                },
+                varIndex
+        );
+    }
+
+    static void visitReturnInsn(MethodNode methodNode, String desc) {
+        methodNode.visitInsn(
+                switch (desc.charAt(0)) {
+                    case 'I', 'Z', 'B', 'C', 'S' -> Opcodes.IRETURN;
+                    case 'J' -> Opcodes.LRETURN;
+                    case 'F' -> Opcodes.FRETURN;
+                    case 'D' -> Opcodes.DRETURN;
+                    case 'L', '[' -> Opcodes.ARETURN;
+                    case 'V' -> Opcodes.RETURN;
+                    default -> throw new UnsupportedOperationException();
+                }
+        );
+    }
+
     static void removePreviousALoad0IfPresent(ListIterator<AbstractInsnNode> insns) {
         if (!insns.hasPrevious()) return;
 

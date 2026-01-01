@@ -6,20 +6,18 @@ import cpw.mods.modlauncher.api.TransformerVoteResult;
 import net.minecraftforge.coremod.api.ASMAPI;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
-import org.objectweb.asm.ConstantDynamic;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.invoke.TypeDescriptor;
-import java.lang.runtime.ObjectMethods;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -707,10 +705,6 @@ final class AnacondyTransformers {
         public @NonNull ClassNode transform(ClassNode classNode, ITransformerVotingContext context) {
             for (var fieldNode : classNode.fields) {
                 if ((fieldNode.access & Opcodes.ACC_STATIC) != 0) continue; // skip static fields
-                if ((fieldNode.access & Opcodes.ACC_FINAL) == 0) {
-                    LOGGER.debug("Field " + fieldNode.name + " is not final in class " + classNode.name + ", record conversion may fail");
-                    continue;
-                }
 
                 // Add record component for each instance final field
                 classNode.visitRecordComponent(fieldNode.name, fieldNode.desc, fieldNode.signature);
@@ -727,14 +721,7 @@ final class AnacondyTransformers {
                     accessorMethod.visitCode();
                     accessorMethod.visitVarInsn(Opcodes.ALOAD, 0);
                     accessorMethod.visitFieldInsn(Opcodes.GETFIELD, classNode.name, fieldNode.name, fieldNode.desc);
-                    switch (fieldNode.desc.charAt(0)) {
-                        case 'I', 'Z', 'B', 'C', 'S' -> accessorMethod.visitInsn(Opcodes.IRETURN);
-                        case 'J' -> accessorMethod.visitInsn(Opcodes.LRETURN);
-                        case 'F' -> accessorMethod.visitInsn(Opcodes.FRETURN);
-                        case 'D' -> accessorMethod.visitInsn(Opcodes.DRETURN);
-                        case 'L', '[' -> accessorMethod.visitInsn(Opcodes.ARETURN);
-                        default -> throw new IllegalStateException("Unexpected primitive type descriptor: " + fieldNode.desc);
-                    }
+                    Utils.visitReturnInsn(accessorMethod, fieldNode.desc);
                     accessorMethod.visitEnd();
                     classNode.methods.add(accessorMethod);
                 }
@@ -776,15 +763,7 @@ final class AnacondyTransformers {
                 int paramIndex = 1;
                 for (var recordComponentNode : classNode.recordComponents) {
                     canonicalCtorNode.visitVarInsn(Opcodes.ALOAD, 0);
-                    char firstChar = recordComponentNode.descriptor.charAt(0);
-                    switch (firstChar) {
-                        case 'I', 'Z', 'B', 'C', 'S' -> canonicalCtorNode.visitVarInsn(Opcodes.ILOAD, paramIndex++);
-                        case 'J' -> canonicalCtorNode.visitVarInsn(Opcodes.LLOAD, paramIndex++);
-                        case 'F' -> canonicalCtorNode.visitVarInsn(Opcodes.FLOAD, paramIndex++);
-                        case 'D' -> canonicalCtorNode.visitVarInsn(Opcodes.DLOAD, paramIndex++);
-                        case 'L', '[' -> canonicalCtorNode.visitVarInsn(Opcodes.ALOAD, paramIndex++);
-                        default -> throw new UnsupportedOperationException();
-                    }
+                    Utils.visitLoadVarInsn(canonicalCtorNode, recordComponentNode.descriptor, paramIndex++);
                     canonicalCtorNode.visitFieldInsn(
                             Opcodes.PUTFIELD,
                             classNode.name,
@@ -818,33 +797,19 @@ final class AnacondyTransformers {
                 equalsMethod.visitVarInsn(Opcodes.ALOAD, 0);
                 equalsMethod.visitVarInsn(Opcodes.ALOAD, 1);
 
-                // Need to generate an INDY call to ObjectMethods.bootstrap() for equals
+                // While records are intended to compare all record components inside their equals() method, doing so
+                // breaks some classes we transform where their identity equals and hashcode is relied upon.
 
-                // But first, prepare the bootstrap arguments
-                var bootstrapArgs = new ArrayList<>();
-                bootstrapArgs.add(Type.getObjectType(classNode.name)); // the class type we're generating equals for
-                // the record component names, separated by semicolons
-                bootstrapArgs.add(classNode.recordComponents.stream()
-                        .map(recordComponentNode -> recordComponentNode.name)
-                        .collect(Collectors.joining(";"))
-                );
-                // the accessor handles for each record component
-                for (var recordComponentNode : classNode.recordComponents) {
-                    bootstrapArgs.add(new Handle(
-                            Opcodes.H_GETFIELD,
-                            classNode.name,
-                            recordComponentNode.name,
-                            recordComponentNode.descriptor,
-                            false
-                    ));
-                }
+                // Therefore, we generate methods that implement the existing behaviour to stay consistent with that
+                // while still passing the requirement of records implementing these methods.
 
-                equalsMethod.visitInvokeDynamicInsn(
-                        "equals",
-                        "(L" + classNode.name + ";Ljava/lang/Object;)Z",
-                        HANDLE_BSM_OBJECT_METHODS,
-                        bootstrapArgs.toArray()
-                );
+                // return this == that
+                var label = new Label();
+                equalsMethod.visitJumpInsn(Opcodes.IF_ACMPEQ, label);
+                equalsMethod.visitInsn(Opcodes.ICONST_0);
+                equalsMethod.visitInsn(Opcodes.IRETURN);
+                equalsMethod.visitLabel(label);
+                equalsMethod.visitInsn(Opcodes.ICONST_1);
                 equalsMethod.visitInsn(Opcodes.IRETURN);
                 classNode.methods.add(equalsMethod);
             }
@@ -855,28 +820,13 @@ final class AnacondyTransformers {
                 hashCodeMethod.visitCode();
                 hashCodeMethod.visitVarInsn(Opcodes.ALOAD, 0);
 
-                // Same process as generating the equals() indy call
-                var bootstrapArgs = new ArrayList<>();
-                bootstrapArgs.add(Type.getObjectType(classNode.name));
-                bootstrapArgs.add(classNode.recordComponents.stream()
-                        .map(recordComponentNode -> recordComponentNode.name)
-                        .collect(Collectors.joining(";"))
-                );
-                for (var recordComponentNode : classNode.recordComponents) {
-                    bootstrapArgs.add(new Handle(
-                            Opcodes.H_GETFIELD,
-                            classNode.name,
-                            recordComponentNode.name,
-                            recordComponentNode.descriptor,
-                            false
-                    ));
-                }
-
-                hashCodeMethod.visitInvokeDynamicInsn(
-                        "hashCode",
-                        "(L" + classNode.name + ";)I",
-                        HANDLE_BSM_OBJECT_METHODS,
-                        bootstrapArgs.toArray()
+                // call System.identityHashCode(this) to preserve existing behaviour, see explanation in equals() impl above
+                hashCodeMethod.visitMethodInsn(
+                        Opcodes.INVOKESTATIC,
+                        "java/lang/System",
+                        "identityHashCode",
+                        "(Ljava/lang/Object;)I",
+                        false
                 );
                 hashCodeMethod.visitInsn(Opcodes.IRETURN);
                 classNode.methods.add(hashCodeMethod);
@@ -888,13 +838,17 @@ final class AnacondyTransformers {
                 toStringMethod.visitCode();
                 toStringMethod.visitVarInsn(Opcodes.ALOAD, 0);
 
-                // Same process as generating the equals() indy call
+                // Need to generate an INDY call to ObjectMethods.bootstrap() for toString() impl
+
+                // But first, prepare the bootstrap arguments
                 var bootstrapArgs = new ArrayList<>();
-                bootstrapArgs.add(Type.getObjectType(classNode.name));
+                bootstrapArgs.add(Type.getObjectType(classNode.name)); // the class type we're generating toString for
+                // the record component names, separated by semicolons
                 bootstrapArgs.add(classNode.recordComponents.stream()
                         .map(recordComponentNode -> recordComponentNode.name)
                         .collect(Collectors.joining(";"))
                 );
+                // the accessor handles for each record component
                 for (var recordComponentNode : classNode.recordComponents) {
                     bootstrapArgs.add(new Handle(
                             Opcodes.H_GETFIELD,
@@ -935,8 +889,8 @@ final class AnacondyTransformers {
                     targetClass("net/minecraft/client/renderer/CubeMap"),
                     targetClass("net/minecraft/client/renderer/GlobalSettingsUniform"),
                     targetClass("net/minecraft/client/renderer/LevelEventHandler"),
-                    targetClass("net/minecraft/client/renderer/LightTexture"), // needs more testing
-                    targetClass("net/minecraft/client/renderer/MappableRingBuffer"), // needs more testing
+                    targetClass("net/minecraft/client/renderer/LightTexture"),
+                    targetClass("net/minecraft/client/renderer/MappableRingBuffer"),
                     targetClass("net/minecraft/client/renderer/SkyRenderer"),
                     targetClass("net/minecraft/client/renderer/SpecialBlockModelRenderer"),
                     targetClass("net/minecraft/client/renderer/SpriteCoordinateExpander"),
@@ -945,37 +899,32 @@ final class AnacondyTransformers {
 
                     targetClass("net/minecraft/resources/Identifier"),
 
-                    // commented out due to ExceptionInInitializerError during testing
-//                    targetClass("net/minecraft/stats/StatType"),
+                    targetClass("net/minecraft/stats/StatType"),
 
                     targetClass("net/minecraft/util/TickThrottler"),
                     targetClass("net/minecraft/util/ZeroBitStorage"),
 
                     targetClass("net/minecraft/util/context/ContextKey"),
-                    // commented out due to ExceptionInInitializerError during testing
-                    // likely needs a different hashcode and equals than the default generated for records
-//                    targetClass("net/minecraft/util/context/ContextKeySet"),
+                    targetClass("net/minecraft/util/context/ContextKeySet"),
                     targetClass("net/minecraft/util/context/ContextMap"),
 
                     targetClass("net/minecraft/world/entity/ai/attributes/AttributeMap"),
 //                    // todo: more classes inside net/minecraft/world/entity/ai/behavior
                     targetClass("net/minecraft/world/entity/ai/behavior/BlockPosTracker"),
-                    targetClass("net/minecraft/world/entity/ai/behavior/DoNothing"), // needs more testing
+                    targetClass("net/minecraft/world/entity/ai/behavior/DoNothing"),
                     targetClass("net/minecraft/world/entity/ai/behavior/EntityTracker"),
 
                     targetClass("net/minecraft/world/entity/ai/gossip/GossipContainer"),
 
-                    targetClass("net/minecraft/world/entity/ai/memory/ExpirableValue"), // needs more testing
-                    // commented out due to ExceptionInInitializerError during testing
-                    // likely needs a different hashcode and equals than the default generated for records
-//                    targetClass("net/minecraft/world/entity/ai/memory/MemoryModuleType"),
+                    targetClass("net/minecraft/world/entity/ai/memory/ExpirableValue"),
+                    targetClass("net/minecraft/world/entity/ai/memory/MemoryModuleType"),
                     targetClass("net/minecraft/world/entity/ai/memory/NearestVisibleLivingEntities"),
                     targetClass("net/minecraft/world/entity/ai/memory/WalkTarget"),
 
                     targetClass("net/minecraft/world/entity/schedule/Activity"),
 
                     targetClass("net/minecraft/world/entity/Crackiness"),
-                    targetClass("net/minecraft/world/entity/EntityType"), // needs more testing
+                    targetClass("net/minecraft/world/entity/EntityType"),
 
                     targetClass("net/minecraft/world/flag/FeatureFlagRegistry"),
                     targetClass("net/minecraft/world/flag/FeatureFlagSet"),
@@ -1061,7 +1010,7 @@ final class AnacondyTransformers {
 
                     targetClass("net/minecraft/world/phys/shapes/IdenticalMerger"),
 
-                    targetClass("net/minecraft/world/ticks/LevelChunkTicks"), // needs more testing
+                    targetClass("net/minecraft/world/ticks/LevelChunkTicks"),
                     targetClass("net/minecraft/world/ticks/LevelTicks"),
                     targetClass("net/minecraft/world/ticks/WorldGenTickAccess"),
 
