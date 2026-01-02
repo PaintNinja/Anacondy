@@ -100,6 +100,7 @@ public final class AnacondyTransformers {
                         "CURRENT_VERSION_INSTANCE"
                 ),
 
+                new DebugEntrySystemSpecsTransformer(),
 
                 new SingletonAccessedForeignFieldsTransformer(
                         Set.of(
