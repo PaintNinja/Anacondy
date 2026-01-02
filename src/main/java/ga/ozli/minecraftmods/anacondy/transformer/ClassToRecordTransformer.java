@@ -65,11 +65,14 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
             }
         }
 
+        if (classNode.recordComponents == null)
+            throw new IllegalArgumentException("Cannot convert class " + classNode.name + " to record because it has no final instance fields.");
+
         // Mark class as a record
         classNode.access |= Opcodes.ACC_RECORD | Opcodes.ACC_FINAL;
 
         if (classNode.superName != null && !classNode.superName.equals("java/lang/Object"))
-            throw new IllegalStateException("Cannot convert class " + classNode.name + " to record because it already has a superclass: " + classNode.superName);
+            throw new IllegalArgumentException("Cannot convert class " + classNode.name + " to record because it already has a superclass: " + classNode.superName);
 
         classNode.superName = "java/lang/Record";
 
@@ -264,9 +267,17 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("com/mojang/math/Divisor"),
                 targetClass("com/mojang/math/Transformation"),
 
+                // commented out as Brigadier is not on the game layer and is therefore unable to be transformed
+//                targetClass("com/mojang/brigadier/LiteralMessage"),
+
                 targetClass("com/mojang/datafixers/util/Pair"),
 
+                targetClass("net/minecraft/client/Camera"),
+                targetClass("net/minecraft/client/KeyboardHandler"),
+                targetClass("net/minecraft/client/MouseHandler"),
                 targetClass("net/minecraft/client/Options"),
+                targetClass("net/minecraft/client/StringSplitter$FlatComponents"),
+                targetClass("net/minecraft/client/StringSplitter$LineComponent"),
                 targetClass("net/minecraft/client/User"),
 
                 targetClass("net/minecraft/client/animation/KeyframeAnimation"),
@@ -274,15 +285,37 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/client/color/block/BlockColors"),
                 targetClass("net/minecraft/client/color/block/BlockTintCache"),
 
+                targetClass("net/minecraft/client/model/geom/EntityModelSet"),
+                targetClass("net/minecraft/client/model/geom/ModelPart"),
+                targetClass("net/minecraft/client/model/geom/ModelPart$Cube"),
+
+                targetClass("net/minecraft/client/multiplayer/LevelLoadTracker"),
+                targetClass("net/minecraft/client/multiplayer/MultiPlayerGameMode"),
+
+                targetClass("net/minecraft/client/gui/Gui"),
+                targetClass("net/minecraft/client/gui/GuiGraphics$ScissorStack"),
+
                 // Todo: this.font inside DebugScreenOverlay that is passed to FpsDebugChart and friends comes from the Minecraft singleton instance
                 targetClass("net/minecraft/client/gui/components/DebugScreenOverlay"),
+
+                targetClass("net/minecraft/client/gui/components/debug/DebugEntryMemory"),
+                targetClass("net/minecraft/client/gui/components/debug/DebugEntryNoop"),
+                targetClass("net/minecraft/client/gui/components/debug/DebugScreenEntryList"),
 
                 targetClass("net/minecraft/client/gui/components/debugchart/ProfilerPieChart"),
 
                 targetClass("net/minecraft/client/gui/font/FontOption$Filter"),
+                targetClass("net/minecraft/client/gui/font/CodepointMap"),
+                targetClass("net/minecraft/client/gui/font/FontTexture$Node"),
 
                 targetClass("net/minecraft/client/gui/font/glyphs/BakedSheetGlyph"),
                 targetClass("net/minecraft/client/gui/font/glyphs/EmptyGlyph"),
+
+                targetClass("net/minecraft/client/gui/render/GuiRenderer"),
+                targetClass("net/minecraft/client/gui/render/GuiRenderer$AtlasPosition"),
+
+                targetClass("net/minecraft/client/gui/render/state/GuiRenderState"),
+                targetClass("net/minecraft/client/gui/render/state/GuiRenderState$Node"),
 
                 targetClass("net/minecraft/client/renderer/block/BlockRenderDispatcher"),
                 targetClass("net/minecraft/client/renderer/block/LiquidBlockRenderer"),
@@ -295,8 +328,26 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/client/renderer/chunk/SectionCompiler"),
                 targetClass("net/minecraft/client/renderer/chunk/SectionCompiler$Results"),
                 targetClass("net/minecraft/client/renderer/chunk/SectionCopy"),
+                targetClass("net/minecraft/client/renderer/chunk/VisGraph"),
+                targetClass("net/minecraft/client/renderer/chunk/VisibilitySet"),
 
                 targetClass("net/minecraft/client/renderer/culling/Frustum"),
+
+                targetClass("net/minecraft/client/renderer/debug/DebugRenderer"),
+
+                targetClass("net/minecraft/client/renderer/entity/EntityRenderDispatcher"),
+
+                targetClass("net/minecraft/client/renderer/feature/BlockFeatureRenderer"),
+                targetClass("net/minecraft/client/renderer/feature/CustomFeatureRenderer$Storage"),
+                targetClass("net/minecraft/client/renderer/feature/FeatureRenderDispatcher"),
+                targetClass("net/minecraft/client/renderer/feature/ItemFeatureRenderer"),
+                targetClass("net/minecraft/client/renderer/feature/ModelFeatureRenderer"),
+                targetClass("net/minecraft/client/renderer/feature/ModelFeatureRenderer$Storage"),
+                targetClass("net/minecraft/client/renderer/feature/ModelPartFeatureRenderer"),
+                targetClass("net/minecraft/client/renderer/feature/ModelPartFeatureRenderer$Storage"),
+                targetClass("net/minecraft/client/renderer/feature/NameTagFeatureRenderer$Storage"),
+                targetClass("net/minecraft/client/renderer/feature/ParticleFeatureRenderer"),
+                // Todo: CONDY Minecraft.getInstance().font inside TextFeatureRenderer#render(...)
 
                 targetClass("net/minecraft/client/renderer/fog/FogRenderer"),
 
@@ -311,12 +362,22 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/client/renderer/texture/OverlayTexture"),
                 targetClass("net/minecraft/client/renderer/texture/TextureManager"),
 
+                targetClass("net/minecraft/client/renderer/state/LevelRenderState"),
+                targetClass("net/minecraft/client/renderer/state/WeatherRenderState"),
+
                 targetClass("net/minecraft/client/renderer/CubeMap"),
                 targetClass("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer"),
+                targetClass("net/minecraft/client/renderer/GameRenderer"),
                 targetClass("net/minecraft/client/renderer/GlobalSettingsUniform"),
+                targetClass("net/minecraft/client/renderer/ItemInHandRenderer"),
                 targetClass("net/minecraft/client/renderer/LevelEventHandler"),
+                targetClass("net/minecraft/client/renderer/LevelRenderer"),
                 targetClass("net/minecraft/client/renderer/LightTexture"),
                 targetClass("net/minecraft/client/renderer/MappableRingBuffer"),
+                targetClass("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer"),
+                targetClass("net/minecraft/client/renderer/SectionOcclusionGraph"),
+                targetClass("net/minecraft/client/renderer/SectionOcclusionGraph$GraphStorage"),
+                targetClass("net/minecraft/client/renderer/SectionOcclusionGraph$SectionToNodeMap"),
                 targetClass("net/minecraft/client/renderer/SkyRenderer"),
                 targetClass("net/minecraft/client/renderer/SpecialBlockModelRenderer"),
                 targetClass("net/minecraft/client/renderer/SpriteCoordinateExpander"),
@@ -341,6 +402,9 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
 
                 targetClass("net/minecraft/nbt/CompoundTag"),
 
+                targetClass("net/minecraft/network/PacketProcessor"),
+                targetClass("net/minecraft/network/ServerConnectionListener"),
+
                 targetClass("net/minecraft/network/chat/MutableComponent"),
                 targetClass("net/minecraft/network/chat/FilterMask"),
                 targetClass("net/minecraft/network/chat/Style"),
@@ -356,14 +420,29 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/resources/RegistryOps$HolderLookupAdapter"),
                 targetClass("net/minecraft/resources/ResourceKey"),
 
+                targetClass("net/minecraft/server/level/WorldGenRegion"),
+
+                targetClass("net/minecraft/server/level/biome/BiomeManager"),
+
+                targetClass("net/minecraft/server/level/progress/LevelLoadProgressTracker"),
+
                 targetClass("net/minecraft/stats/StatType"),
 
+                targetClass("net/minecraft/tags/TagEntry"),
+
+                targetClass("net/minecraft/util/SegmentedAnglePrecision"),
+                targetClass("net/minecraft/util/SimpleBitStorage"),
+                targetClass("net/minecraft/util/StaticCache2D"),
+                targetClass("net/minecraft/util/ThreadingDetector"),
                 targetClass("net/minecraft/util/TickThrottler"),
                 targetClass("net/minecraft/util/ZeroBitStorage"),
 
                 targetClass("net/minecraft/util/context/ContextKey"),
                 targetClass("net/minecraft/util/context/ContextKeySet"),
                 targetClass("net/minecraft/util/context/ContextMap"),
+
+                targetClass("net/minecraft/world/entity/ai/Brain$MemoryValue"),
+                targetClass("net/minecraft/world/entity/ai/Brain$Provider"),
 
                 targetClass("net/minecraft/world/entity/ai/attributes/AttributeMap"),
 
@@ -393,11 +472,14 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
 
                 targetClass("net/minecraft/world/level/ChunkPos"),
                 targetClass("net/minecraft/world/level/ClipBlockStateContext"),
+                targetClass("net/minecraft/world/level/ClipContext"),
                 targetClass("net/minecraft/world/level/DataPackConfig"),
                 targetClass("net/minecraft/world/level/LevelSettings"),
                 targetClass("net/minecraft/world/level/StructureManager"),
 
                 targetClass("net/minecraft/world/level/biome/BiomeGenerationSettings"),
+
+                targetClass("net/minecraft/world/level/chunk/PalettedContainer"),
 
                 targetClass("net/minecraft/world/level/levelgen/Beardifier"),
                 targetClass("net/minecraft/world/level/levelgen/BelowZeroRetrogen"),
@@ -405,6 +487,8 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/world/level/levelgen/GeodeCrackSettings"),
                 targetClass("net/minecraft/world/level/levelgen/GeodeLayerSettings"),
                 targetClass("net/minecraft/world/level/levelgen/Heightmap"),
+                targetClass("net/minecraft/world/level/levelgen/MarsagliaPolarGaussian"),
+                targetClass("net/minecraft/world/level/levelgen/SingleThreadedRandomSource"),
                 targetClass("net/minecraft/world/level/levelgen/SurfaceSystem"),
                 targetClass("net/minecraft/world/level/levelgen/WorldOptions"),
                 targetClass("net/minecraft/world/level/levelgen/XoroshiroRandomSource"),
@@ -438,6 +522,12 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/world/level/levelgen/presets/WorldPreset"),
 
                 targetClass("net/minecraft/world/level/levelgen/structure/StructureCheck"),
+
+                targetClass("net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate"),
+                targetClass("net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate$Palette"),
+                targetClass("net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate$SimplePalette"),
+                targetClass("net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate$StructureEntityInfo"),
+                targetClass("net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplateManager"),
 
                 targetClass("net/minecraft/world/level/levelgen/sampler/BlendedNoise"),
                 targetClass("net/minecraft/world/level/levelgen/sampler/NormalNoise"),
