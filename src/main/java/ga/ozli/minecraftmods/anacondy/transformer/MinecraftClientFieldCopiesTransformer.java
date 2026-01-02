@@ -65,13 +65,9 @@ final class MinecraftClientFieldCopiesTransformer implements Transformer<ClassNo
                 targetClass("com/mojang/realmsclient/client/RealmsClient"),
 
                 targetClass("net/minecraft/client/GameNarrator"),
-                targetClass("net/minecraft/client/KeyboardHandler"),
-                targetClass("net/minecraft/client/MouseHandler"),
-                targetClass("net/minecraft/client/Options"),
                 targetClass("net/minecraft/client/PeriodicNotificationManager$NotificationTask"),
 
                 targetClass("net/minecraft/client/gui/BundleMouseActions"),
-                targetClass("net/minecraft/client/gui/Gui"),
                 targetClass("net/minecraft/client/gui/GuiGraphics"),
 
                 targetClass("net/minecraft/client/gui/components/AbstractSelectionList"),
@@ -124,18 +120,13 @@ final class MinecraftClientFieldCopiesTransformer implements Transformer<ClassNo
                 targetClass("net/minecraft/client/multiplayer/ClientHandshakePacketListenerImpl"),
                 targetClass("net/minecraft/client/multiplayer/ClientLevel"),
                 targetClass("net/minecraft/client/multiplayer/ClientSuggestionProvider"),
-                targetClass("net/minecraft/client/multiplayer/MultiPlayerGameMode"),
                 targetClass("net/minecraft/client/multiplayer/ServerList"),
                 targetClass("net/minecraft/client/multiplayer/chat/ChatListener"),
 
                 targetClass("net/minecraft/client/player/LocalPlayer"),
                 targetClass("net/minecraft/client/player/LocalPlayerResolver"),
 
-                targetClass("net/minecraft/client/renderer/GameRenderer"),
                 targetClass("net/minecraft/client/renderer/ItemInHandRenderer"),
-                targetClass("net/minecraft/client/renderer/LevelEventHandler"),
-                targetClass("net/minecraft/client/renderer/LevelRenderer"),
-                targetClass("net/minecraft/client/renderer/LightTexture"),
                 targetClass("net/minecraft/client/renderer/PanoramaRenderer"),
                 targetClass("net/minecraft/client/renderer/ScreenEffectRenderer"),
                 targetClass("net/minecraft/client/renderer/VirtualScreen"),
