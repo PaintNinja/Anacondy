@@ -253,6 +253,9 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
 
                 targetClass("com/mojang/blaze3d/platform/cursor/CursorType"),
 
+                targetClass("com/mojang/blaze3d/resources/CrossFrameResourcePool"),
+                targetClass("com/mojang/blaze3d/resources/CrossFrameResourcePool$ResourceEntry"),
+
                 targetClass("com/mojang/blaze3d/systems/RenderSystem$AutoStorageIndexBuffer"),
 
                 targetClass("com/mojang/blaze3d/vertex/BufferBuilder"),
@@ -374,7 +377,12 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/client/renderer/LevelRenderer"),
                 targetClass("net/minecraft/client/renderer/LightTexture"),
                 targetClass("net/minecraft/client/renderer/MappableRingBuffer"),
+                targetClass("net/minecraft/client/renderer/MultiBufferSource$BufferSource"),
+                targetClass("net/minecraft/client/renderer/OutlineBufferSource"),
                 targetClass("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer"),
+                targetClass("net/minecraft/client/renderer/RenderBuffers"),
+                targetClass("net/minecraft/client/renderer/SectionBufferBuilderPack"),
+                targetClass("net/minecraft/client/renderer/SectionBufferBuilderPool"),
                 targetClass("net/minecraft/client/renderer/SectionOcclusionGraph"),
                 targetClass("net/minecraft/client/renderer/SectionOcclusionGraph$GraphStorage"),
                 targetClass("net/minecraft/client/renderer/SectionOcclusionGraph$SectionToNodeMap"),
