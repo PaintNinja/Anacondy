@@ -84,6 +84,16 @@ public final class AnacondyTransformers {
                         "MINECRAFT_INSTANCE"
                 ),
 
+                new StaticFieldGetToCondy(
+                        targetMethod(
+                                "net/minecraft/SharedConstants",
+                                "getCurrentVersion",
+                                "()Lnet/minecraft/WorldVersion;"
+                        ),
+                        "CURRENT_VERSION",
+                        "CURRENT_VERSION_INSTANCE"
+                ),
+
                 new SingletonAccessedFieldsTransformer(
                         targetClass(Utils.MINECRAFT_CLASS_NAME),
                         CONDY_MC_INSTANCE_FIELD,
