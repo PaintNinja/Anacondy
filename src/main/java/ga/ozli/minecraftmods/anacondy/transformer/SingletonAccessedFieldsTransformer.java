@@ -17,8 +17,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-// Todo: Look into supporting chaining of singleton accessed fields from other classes
-//       e.g.: Minecraft.levelRenderer.levelRenderState.entityRenderStates or this.minecraft.options.getCameraType()
 /**
  * Rewrites {@code GETFIELD this.finalField} instructions inside the singleton classes to instead use ConstantDynamics
  * that access the final fields via the singleton instance, effectively turning them into trusted final fields.
@@ -68,7 +66,7 @@ record SingletonAccessedFieldsTransformer(
                     continue;
 
                 // First replace the ALOAD 0/instance grab insn with a NOP
-                Utils.removePreviousInsnsIfSingletonInstanceLoad(insns);
+                Utils.removePreviousInsnsIfSingletonInstanceLoad(insns, true);
 
                 // Then replace with a CONDY that accesses the field using the singleton instance
                 insns.set(new LdcInsnNode(new ConstantDynamic(

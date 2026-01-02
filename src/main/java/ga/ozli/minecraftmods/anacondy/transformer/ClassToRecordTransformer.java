@@ -350,7 +350,6 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/client/renderer/feature/ModelPartFeatureRenderer$Storage"),
                 targetClass("net/minecraft/client/renderer/feature/NameTagFeatureRenderer$Storage"),
                 targetClass("net/minecraft/client/renderer/feature/ParticleFeatureRenderer"),
-                // Todo: CONDY Minecraft.getInstance().font inside TextFeatureRenderer#render(...)
 
                 targetClass("net/minecraft/client/renderer/fog/FogRenderer"),
 

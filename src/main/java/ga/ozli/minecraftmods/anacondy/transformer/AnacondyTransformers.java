@@ -71,6 +71,12 @@ public final class AnacondyTransformers {
             )
     );
 
+    /** Fields in net/minecraft/client/Minecraft that are assumed to always be public final fields **/
+    private static final Set<String> TRUSTED_MC_FIELDS = Set.of(
+            "options", "levelRenderer", "particleEngine", "gameRenderer", "mouseHandler", "keyboardHandler", "font",
+            "gui", "debugEntries"
+    );
+
     static final AtomicInteger TOTAL_REWRITES = new AtomicInteger(0);
 
     @SuppressWarnings("rawtypes")
@@ -92,6 +98,37 @@ public final class AnacondyTransformers {
                         ),
                         "CURRENT_VERSION",
                         "CURRENT_VERSION_INSTANCE"
+                ),
+
+
+                new SingletonAccessedForeignFieldsTransformer(
+                        Set.of(
+                                // some of these are commented out due to deadlock issues during startup - needs further investigation
+//                                targetClass("net/minecraft/client/MouseHandler"),
+
+//                                targetClass("net/minecraft/client/gui/components/DebugScreenOverlay"),
+
+                                targetClass("net/minecraft/client/gui/components/debug/DebugEntryFps"),
+                                targetClass("net/minecraft/client/gui/components/debug/DebugEntryEntityRenderStats"),
+                                targetClass("net/minecraft/client/gui/components/debug/DebugEntryParticleRenderStats"),
+                                targetClass("net/minecraft/client/gui/components/debug/DebugEntryPostEffect"),
+                                targetClass("net/minecraft/client/gui/components/debug/DebugEntrySimplePerformanceImpactors"),
+//
+                                targetClass("net/minecraft/client/gui/render/GuiRenderer"),
+
+//                                targetClass("net/minecraft/client/multiplayer/ClientLevel"),
+
+                                targetClass("net/minecraft/client/renderer/CloudRenderer"),
+//                                targetClass("net/minecraft/client/renderer/GameRenderer")
+//                                targetClass("net/minecraft/client/renderer/LevelRenderer"),
+//                                targetClass("net/minecraft/client/renderer/ItemInHandRenderer"),
+
+                                targetClass("net/minecraft/client/renderer/debug/DebugRenderer")
+
+//                                targetClass("net/minecraft/client/renderer/feature/TextFeatureRenderer")
+                        ),
+                        CONDY_MC_GET_INSTANCE,
+                        TRUSTED_MC_FIELDS
                 ),
 
                 new SingletonAccessedFieldsTransformer(

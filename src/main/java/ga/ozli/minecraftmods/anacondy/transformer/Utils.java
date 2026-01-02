@@ -34,6 +34,10 @@ final class Utils {
         return descStr.substring(1, descStr.length() - 1);
     }
 
+    static String fieldDescToInternalName(String fieldDesc) {
+        return fieldDesc.substring(1, fieldDesc.length() - 1);
+    }
+
     static String camelCaseToScreamingSnakeCase(String input) {
         StringBuilder result = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
@@ -44,6 +48,11 @@ final class Utils {
             result.append(Character.toUpperCase(c));
         }
         return result.toString();
+    }
+
+    static String returnTypeNameFromMethodDesc(String methodDesc) {
+        int returnTypeStart = methodDesc.lastIndexOf(')') + 1;
+        return methodDesc.substring(returnTypeStart);
     }
 
     static void visitLoadVarInsn(MethodNode methodNode, String desc, int varIndex) {
@@ -95,7 +104,7 @@ final class Utils {
         insns.next();
     }
 
-    static void removePreviousInsnsIfSingletonInstanceLoad(ListIterator<AbstractInsnNode> insns) {
+    static void removePreviousInsnsIfSingletonInstanceLoad(ListIterator<AbstractInsnNode> insns, boolean fromSelf) {
         if (insns.hasPrevious()) {
             insns.previous();
             if (!insns.hasPrevious()) {
@@ -103,7 +112,7 @@ final class Utils {
                 return;
             }
 
-            if (isSingletonInstanceInsn(insns.previous())) {
+            if (isSingletonInstanceInsn(insns.previous(), fromSelf)) {
                 // Replace the singleton instance load instruction with a NOP as it's redundant, due to the following
                 // instruction being a CONDY for the instance field access on the singleton instance.
 
@@ -118,14 +127,25 @@ final class Utils {
         }
     }
 
-    /** @return Whether the instruction is a load of the singleton instance, either via CONDY, field access, method call or `this` */
-    private static boolean isSingletonInstanceInsn(AbstractInsnNode insn) {
+    /**
+     * @return Whether the instruction is a load of the singleton instance, either via CONDY, field access, method call,
+     * local variable or `this` (the last one if `fromSelf` is true).
+     */
+    private static boolean isSingletonInstanceInsn(AbstractInsnNode insn, boolean fromSelf) {
         return switch (insn) {
             case LdcInsnNode ldcInsnNode when ldcInsnNode.cst instanceof ConstantDynamic constantDynamic
                     && constantDynamic.getName().endsWith("_INSTANCE") -> true;
             case FieldInsnNode prevFieldInsn when "instance".equals(prevFieldInsn.name) -> true;
             case MethodInsnNode prevMethodInsn when "getInstance".equals(prevMethodInsn.name) -> true;
-            case VarInsnNode prevVarInsn when prevVarInsn.getOpcode() == Opcodes.ALOAD && prevVarInsn.var == 0 -> true;
+            case VarInsnNode prevVarInsn when prevVarInsn.getOpcode() == Opcodes.ALOAD -> {
+                if (prevVarInsn.var == 0) {
+                    // ALOAD 0 (this)
+                    yield fromSelf;
+                } else {
+                    // ALOAD n (local variable)
+                    yield true;
+                }
+            }
             default -> false;
         };
     }
