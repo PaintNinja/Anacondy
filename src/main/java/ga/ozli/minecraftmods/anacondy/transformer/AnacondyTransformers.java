@@ -100,6 +100,15 @@ public final class AnacondyTransformers {
                         "CURRENT_VERSION_INSTANCE"
                 ),
 
+                new StaticFieldGetToIndy(
+                        targetMethod(
+                                "com/mojang/blaze3d/platform/GLX",
+                                "_getCpuInfo",
+                                "()Ljava/lang/String;"
+                        ),
+                        "cpuInfo"
+                ),
+
                 new DebugEntrySystemSpecsTransformer(),
 
                 new SingletonAccessedForeignFieldsTransformer(
@@ -336,18 +345,15 @@ public final class AnacondyTransformers {
                         "renderThread"
                 ),
 
-                // Todo: If the game crashes early then Anacondy gets blamed for the crash due to constant folding null.
-                //       Look into INDY for this instead.
                 // `GETSTATIC RenderSystem.DEVICE` inside `RenderSystem.getDevice()`
-//                new StaticFieldGetToCondyTransformer(
-//                        targetMethod(
-//                                "com/mojang/blaze3d/systems/RenderSystem",
-//                                "getDevice",
-//                                "()Lcom/mojang/blaze3d/systems/GpuDevice;"
-//                        ),
-//                        "DEVICE",
-//                        "DEVICE"
-//                ),
+                new StaticFieldGetToIndy(
+                        targetMethod(
+                                "com/mojang/blaze3d/systems/RenderSystem",
+                                "getDevice",
+                                "()Lcom/mojang/blaze3d/systems/GpuDevice;"
+                        ),
+                        "DEVICE"
+                ),
 
                 // `GETSTATIC RenderSystem.dynamicUniforms` inside `RenderSystem.getDynamicUniforms()`
                 new StaticFieldGetToCondy(targetMethod(
