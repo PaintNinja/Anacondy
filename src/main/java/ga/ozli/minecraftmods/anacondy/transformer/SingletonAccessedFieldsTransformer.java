@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 record SingletonAccessedFieldsTransformer(
         Target targetClass,
         ConstantDynamic singletonAccessorCondy,
-        Predicate<String> isBlacklisted
+        Predicate<String> isMethodNameBlacklisted
 ) implements Transformer<ClassNode>, ITransformer<ClassNode> {
     SingletonAccessedFieldsTransformer(Target targetClass, ConstantDynamic singletonAccessorCondy) {
         this(targetClass, singletonAccessorCondy, Set.of(ConstantDescs.CLASS_INIT_NAME, ConstantDescs.INIT_NAME, "close"));
@@ -53,7 +53,7 @@ record SingletonAccessedFieldsTransformer(
                 .collect(Collectors.toUnmodifiableSet());
 
         for (var methodNode : classNode.methods) {
-            if (isBlacklisted.test(methodNode.name)) continue;
+            if (isMethodNameBlacklisted.test(methodNode.name)) continue;
             if (methodNode.name.contains("$")) continue; // skip lambdas, anonymous classes, etc.
 
             var insns = methodNode.instructions.iterator();

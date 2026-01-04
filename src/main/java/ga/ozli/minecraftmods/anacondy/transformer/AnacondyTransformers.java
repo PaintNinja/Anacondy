@@ -105,6 +105,8 @@ public final class AnacondyTransformers {
                 new SingletonAccessedForeignFieldsTransformer(
                         Set.of(
                                 // some of these are commented out due to deadlock issues during startup - needs further investigation
+                                targetClass("com/mojang/blaze3d/systems/RenderSystem"),
+
 //                                targetClass("net/minecraft/client/MouseHandler"),
 
 //                                targetClass("net/minecraft/client/gui/components/DebugScreenOverlay"),
@@ -122,6 +124,7 @@ public final class AnacondyTransformers {
                                 targetClass("net/minecraft/client/renderer/CloudRenderer"),
 //                                targetClass("net/minecraft/client/renderer/GameRenderer")
 //                                targetClass("net/minecraft/client/renderer/LevelRenderer"),
+//                                targetClass("net/minecraft/client/renderer/LightTexture"),
 //                                targetClass("net/minecraft/client/renderer/ItemInHandRenderer"),
 
                                 targetClass("net/minecraft/client/renderer/debug/DebugRenderer")
