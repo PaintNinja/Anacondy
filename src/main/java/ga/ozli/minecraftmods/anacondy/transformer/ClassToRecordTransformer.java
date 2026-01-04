@@ -276,6 +276,9 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("com/mojang/datafixers/util/Pair"),
 
                 targetClass("net/minecraft/client/Camera"),
+                targetClass("net/minecraft/client/Camera$NearPlane"),
+                targetClass("net/minecraft/client/DeltaTracker$DefaultValue"),
+                targetClass("net/minecraft/client/DeltaTracker$Timer"),
                 targetClass("net/minecraft/client/KeyboardHandler"),
                 targetClass("net/minecraft/client/MouseHandler"),
                 targetClass("net/minecraft/client/Options"),
@@ -447,6 +450,10 @@ final class ClassToRecordTransformer implements Transformer<ClassNode>, ITransfo
                 targetClass("net/minecraft/util/context/ContextKey"),
                 targetClass("net/minecraft/util/context/ContextKeySet"),
                 targetClass("net/minecraft/util/context/ContextMap"),
+
+                targetClass("net/minecraft/util/profiling/Zone"),
+
+                targetClass("net/minecraft/world/attribute/EnvironmentAttribute"),
 
                 targetClass("net/minecraft/world/entity/ai/Brain$MemoryValue"),
                 targetClass("net/minecraft/world/entity/ai/Brain$Provider"),
