@@ -11,6 +11,7 @@ import org.objectweb.asm.tree.*;
 
 import java.lang.constant.ConstantDescs;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A version of {@link SingletonAccessedFieldsTransformer} intended for fields inside a different singleton class than
@@ -19,12 +20,31 @@ import java.util.Set;
 record SingletonAccessedForeignFieldsTransformer(
         Set<Target> targetClasses,
         ConstantDynamic singletonAccessorCondy,
-        Set<String> allowedForeignFields
+        Set<String> allowedForeignFields,
+        Predicate<String> isMethodNameBlacklisted
 ) implements Transformer<ClassNode>, ITransformer<ClassNode> {
+    SingletonAccessedForeignFieldsTransformer(Set<Target> targetClasses, ConstantDynamic singletonAccessorCondy, Set<String> allowedForeignFields) {
+        this(
+                targetClasses,
+                singletonAccessorCondy,
+                allowedForeignFields,
+                Set.of(ConstantDescs.CLASS_INIT_NAME, ConstantDescs.INIT_NAME, "close")
+        );
+    }
+
+    SingletonAccessedForeignFieldsTransformer(
+            Set<Target> targetClasses,
+            ConstantDynamic singletonAccessorCondy,
+            Set<String> allowedForeignFields,
+            Set<String> blacklistedMethodNames
+    ) {
+        this(targetClasses, singletonAccessorCondy, allowedForeignFields, blacklistedMethodNames::contains);
+    }
+
     @Override
     public @NonNull ClassNode transform(ClassNode classNode, ITransformerVotingContext context) {
         for (var methodNode : classNode.methods) {
-            if (methodNode.name.equals(ConstantDescs.INIT_NAME)) continue;
+            if (isMethodNameBlacklisted.test(methodNode.name)) continue;
             if (methodNode.name.contains("$")) continue;
 
             var insns = methodNode.instructions.iterator();
