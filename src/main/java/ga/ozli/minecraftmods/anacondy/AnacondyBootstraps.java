@@ -16,12 +16,19 @@ public final class AnacondyBootstraps {
         }
     };
     private static final MethodHandle CHECKER_HANDLE;
+    private static final MethodHandle AGGRESSIVE_SETTER_HANDLE;
     static {
         try {
-            CHECKER_HANDLE = MethodHandles.lookup().findStatic(
+            var lookup = MethodHandles.lookup();
+            CHECKER_HANDLE = lookup.findStatic(
                     AnacondyBootstraps.class,
                     "checkAndUpdateGrabber",
                     MethodType.methodType(Object.class, CallSite.class, MethodHandle.class)
+            );
+            AGGRESSIVE_SETTER_HANDLE = lookup.findStatic(
+                    AnacondyBootstraps.class,
+                    "updateGrabberForSetter",
+                    MethodType.methodType(void.class, CallSite.class, Class.class, MethodHandle.class, Object.class)
             );
         } catch (NoSuchMethodException | IllegalAccessException e) {
             throw new ExceptionInInitializerError(e);
@@ -40,6 +47,7 @@ public final class AnacondyBootstraps {
         return Objects.requireNonNull(handle.invokeWithArguments(args), name);
     }
 
+    /** @see ga.ozli.minecraftmods.anacondy.transformer.StaticFieldGetToIndy.ConstantOnceNonNull */
     public static CallSite constantFoldWhenNonNull(
             MethodHandles.Lookup lookup, String name, MethodType methodType, Class<?> owner, MethodHandle fieldGetter
     ) throws Throwable {
@@ -87,5 +95,44 @@ public final class AnacondyBootstraps {
             grabber.setTarget(MethodHandles.constant(grabber.type().returnType(), value));
 
         return value;
+    }
+
+    /** @see ga.ozli.minecraftmods.anacondy.transformer.StaticFieldGetToIndy.MostlyConstant */
+    public static CallSite mostlyConstantFieldGetter(
+        MethodHandles.Lookup lookup, String name, MethodType methodType, Class<?> owner, MethodHandle getterHandle
+    ) {
+        var knownFieldsInClass = VALUES.get(owner);
+
+        // first try the fast-path that avoids an allocating lambda
+        var grabber = knownFieldsInClass.get(name);
+        if (grabber != null)
+            return grabber;
+
+        // otherwise create a new MutableCallSite for this field if necessary
+        return knownFieldsInClass.computeIfAbsent(name, k -> new MutableCallSite(getterHandle));
+    }
+
+    /** @see ga.ozli.minecraftmods.anacondy.transformer.StaticFieldGetToIndy.MostlyConstant */
+    public static CallSite mostlyConstantFieldSetter(
+        MethodHandles.Lookup lookup, String name, MethodType methodType, Class<?> owner, MethodHandle setterHandle
+    ) {
+        var knownFieldsInClass = VALUES.get(owner);
+
+        var grabber = knownFieldsInClass.get(name);
+        if (grabber == null)
+            grabber = knownFieldsInClass.computeIfAbsent(name, k -> new MutableCallSite(methodType));
+
+        var setterTarget = MethodHandles.insertArguments(
+                AGGRESSIVE_SETTER_HANDLE,
+                0, grabber, methodType.parameterType(0), setterHandle
+        ).asType(methodType);
+
+        return new ConstantCallSite(setterTarget.asType(methodType));
+    }
+
+    private static void updateGrabberForSetter(CallSite grabber, Class<?> returnType, MethodHandle setter, Object value)
+            throws Throwable {
+        setter.invoke(value);
+        grabber.setTarget(MethodHandles.constant(returnType, value));
     }
 }

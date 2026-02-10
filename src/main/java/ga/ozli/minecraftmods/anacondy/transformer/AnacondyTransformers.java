@@ -100,7 +100,7 @@ public final class AnacondyTransformers {
                         "CURRENT_VERSION_INSTANCE"
                 ),
 
-                new StaticFieldGetToIndy(
+                new StaticFieldGetToIndy.ConstantOnceNonNull(
                         targetMethod(
                                 "com/mojang/blaze3d/platform/GLX",
                                 "_getCpuInfo",
@@ -334,6 +334,12 @@ public final class AnacondyTransformers {
                         "TESSELATOR_INSTANCE"
                 ),
 
+                // todo: jtracy is not on the game layer so can't be transformed :(
+//                new StaticFieldGetToIndy.MostlyConstant(
+//                        targetClass("com/mojang/jtracy/TracyClient"),
+//                        "loaded"
+//                ),
+
                 //region RenderSystem
                 // `GETSTATIC RenderSystem.renderThread` inside `RenderSystem.isOnRenderThread()`
                 new StaticFieldGetToCondy(
@@ -346,7 +352,7 @@ public final class AnacondyTransformers {
                 ),
 
                 // `GETSTATIC RenderSystem.DEVICE` inside `RenderSystem.getDevice()`
-                new StaticFieldGetToIndy(
+                new StaticFieldGetToIndy.ConstantOnceNonNull(
                         targetMethod(
                                 "com/mojang/blaze3d/systems/RenderSystem",
                                 "getDevice",
